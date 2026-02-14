@@ -1,0 +1,6 @@
+{
+    "name": "speedy-laundry/backend",
+    "require": {
+        "phpmailer/phpmailer": "^6.9"
+    }
+}

@@ -1,0 +1,16 @@
+# Speedy Laundry Backend - Apache config
+
+# Custom 403 Forbidden page
+ErrorDocument 403 http://localhost/speedy-laundry/backend/403.php
+
+# Deny direct access to sensitive folders (backup if folder .htaccess is bypassed)
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Protect config, core, sql, vendor from web access
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(config|core|sql|vendor)/ - [F,L]
+</IfModule>
