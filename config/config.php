@@ -16,8 +16,8 @@ define('SITE_NAME', 'Speedy Laundry');
 define('SMTP_HOST', 'smtp.gmail.com');           // e.g. smtp.gmail.com
 define('SMTP_PORT', 465);          // 587 = tls, 465 = ssl
 define('SMTP_SECURE', 'ssl');      // 'tls' for 587, 'ssl' for 465
-define('SMTP_USER', 'dreamcreation.help@gmail.com');           // SMTP username
-define('SMTP_PASS', 'ybazwcvkxgtrytlr');           // SMTP password / app password
+define('SMTP_USER', 'developer.speedylaundry@gmail.com');           // SMTP username
+define('SMTP_PASS', 'rftxqivoggzidrfq');           // SMTP password / app password
 define('SMTP_DEBUG', false);                       // Set true to see SMTP conversation in CLI
 
 // Upload base URL for review photos - must be web-accessible (e.g. http://localhost/speedy-laundry/backend)

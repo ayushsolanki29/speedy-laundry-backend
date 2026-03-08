@@ -13,11 +13,11 @@ class EmailQueue {
      * Queue an email. Returns true on success.
      * @param bool $isHtml When true, body is HTML
      */
-    public static function push(string $toEmail, string $subject, string $body, string $type, ?string $toName = null, bool $isHtml = false): bool {
+    public static function push(string $toEmail, string $subject, string $body, string $type, ?string $toName = null, bool $isHtml = false, int $maxAttempts = 3): bool {
         try {
             $db = Database::getInstance()->getConnection();
             $stmt = $db->prepare(
-                "INSERT INTO email_queue (to_email, to_name, subject, body, type, is_html) VALUES (?, ?, ?, ?, ?, ?)"
+                "INSERT INTO email_queue (to_email, to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?)"
             );
             return $stmt->execute([
                 trim($toEmail),
@@ -25,11 +25,62 @@ class EmailQueue {
                 trim($subject),
                 $body,
                 $type,
-                $isHtml ? 1 : 0
+                $isHtml ? 1 : 0,
+                $maxAttempts
             ]);
         } catch (Exception $e) {
             error_log("EmailQueue push error: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Process pending emails in the queue
+     * @param int $batchSize Number of emails to process in one go
+     * @return int Number of successfully sent emails
+     */
+    public static function process(int $batchSize = 20): int {
+        require_once __DIR__ . '/Mailer.php';
+        $processed = 0;
+
+        try {
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                "SELECT * FROM email_queue 
+                 WHERE status = 'pending' AND attempts < max_attempts 
+                 ORDER BY created_at ASC LIMIT ?"
+            );
+            $stmt->bindValue(1, $batchSize, PDO::PARAM_INT);
+            $stmt->execute();
+            $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($emails as $email) {
+                $success = Mailer::send(
+                    $email['to_email'],
+                    $email['subject'],
+                    $email['body'],
+                    $email['to_name'],
+                    (int)$email['is_html'] === 1
+                );
+
+                if ($success) {
+                    $deleteStmt = $db->prepare("DELETE FROM email_queue WHERE id = ?");
+                    $deleteStmt->execute([$email['id']]);
+                    $processed++;
+                } else {
+                    $updateStmt = $db->prepare(
+                        "UPDATE email_queue SET status = ?, attempts = attempts + 1, sent_at = ?, error_message = ? WHERE id = ?"
+                    );
+                    $attempts = (int)$email['attempts'] + 1;
+                    $newStatus = $attempts >= (int)$email['max_attempts'] ? 'failed' : 'pending';
+                    $errorMsg = class_exists('Mailer') && !empty(Mailer::$lastError) ? Mailer::$lastError : 'Mail send failed';
+                    $updateStmt->execute([$newStatus, null, $errorMsg, $email['id']]);
+                }
+            }
+            return $processed;
+        } catch (Exception $e) {
+            error_log("EmailQueue process error: " . $e->getMessage());
+            return 0;
         }
     }
 
@@ -46,10 +97,10 @@ class EmailQueue {
         $siteName = defined('SITE_NAME') ? SITE_NAME : 'Speedy Laundry';
         $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'info@speedylaundry.co.uk';
 
-        // Admin: New submission
+        // Admin: New submission (HTML Table)
         $adminSubject = "[{$siteName}] New Pickup Enquiry from {$name}";
-        $adminBody = self::buildEnquiryAdminBody($name, $email, $phone, $postcode, $service, $message);
-        self::push($adminEmail, $adminSubject, $adminBody, 'enquiry_admin');
+        $adminBody = self::buildEnquiryAdminHtml($name, $email, $phone, $postcode, $service, $message, $siteName);
+        self::push($adminEmail, $adminSubject, $adminBody, 'enquiry_admin', null, true);
 
         // User: Confirmation (HTML)
         $userSubject = "Your submission received – {$siteName}";
@@ -70,10 +121,10 @@ class EmailQueue {
         $siteName = defined('SITE_NAME') ? SITE_NAME : 'Speedy Laundry';
         $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'info@speedylaundry.co.uk';
 
-        // Admin: New business submission
+        // Admin: New business submission (HTML Table)
         $adminSubject = "[{$siteName}] New Business Quote Request from {$businessName}";
-        $adminBody = self::buildBusinessAdminBody($businessName, $name, $email, $phone, $industry, $message);
-        self::push($adminEmail, $adminSubject, $adminBody, 'business_admin');
+        $adminBody = self::buildBusinessAdminHtml($businessName, $name, $email, $phone, $industry, $message, $siteName);
+        self::push($adminEmail, $adminSubject, $adminBody, 'business_admin', null, true);
 
         // User: Confirmation (HTML)
         $userSubject = "Your business request received – {$siteName}";
@@ -81,22 +132,26 @@ class EmailQueue {
         self::push($email, $userSubject, $userBody, 'business_user', $name, true);
     }
 
-    private static function buildEnquiryAdminBody(string $name, string $email, string $phone, string $postcode, string $service, string $message): string {
-        $lines = [
-            "New pickup enquiry submitted:",
-            "",
-            "Name: {$name}",
-            "Email: {$email}",
-            "Phone: {$phone}",
-            "Postcode: {$postcode}",
-            "Service: " . ($service ?: 'Not specified'),
-            "",
-            "Message:",
-            $message ?: '(No message)',
-            "",
-            "— Please log in to your admin panel to respond."
+    private static function buildEnquiryAdminHtml(string $name, string $email, string $phone, string $postcode, string $service, string $message, string $siteName): string {
+        $rows = [
+            'Name' => $name,
+            'Email' => $email,
+            'Phone' => $phone,
+            'Postcode' => $postcode,
+            'Service' => $service ?: 'Not specified',
+            'Message' => $message ?: '(No message)'
         ];
-        return implode("\n", $lines);
+        
+        $tableHtml = self::renderAdminTable("New Pickup Enquiry", $rows);
+        
+        return self::wrapHtmlEmail(
+            "New Pickup Submission",
+            "A new pickup enquiry has been received from the website.",
+            $tableHtml,
+            "Please log in to your admin panel to respond.",
+            $siteName,
+            "enquiry"
+        );
     }
 
     private static function buildEnquiryUserBody(string $name, string $siteName): string {
@@ -117,22 +172,26 @@ class EmailQueue {
         );
     }
 
-    private static function buildBusinessAdminBody(string $business, string $name, string $email, string $phone, string $industry, string $message): string {
-        $lines = [
-            "New business quote request submitted:",
-            "",
-            "Business: {$business}",
-            "Contact: {$name}",
-            "Email: {$email}",
-            "Phone: {$phone}",
-            "Industry: " . ($industry ?: 'Not specified'),
-            "",
-            "Message:",
-            $message ?: '(No message)',
-            "",
-            "— Please log in to your admin panel to respond."
+    private static function buildBusinessAdminHtml(string $business, string $name, string $email, string $phone, string $industry, string $message, string $siteName): string {
+        $rows = [
+            'Business' => $business,
+            'Contact' => $name,
+            'Email' => $email,
+            'Phone' => $phone,
+            'Industry' => $industry ?: 'Not specified',
+            'Message' => $message ?: '(No message)'
         ];
-        return implode("\n", $lines);
+
+        $tableHtml = self::renderAdminTable("New Business Quote Request", $rows);
+
+        return self::wrapHtmlEmail(
+            "Business Quote Request",
+            "A new professional laundry request has been received from the website.",
+            $tableHtml,
+            "Please log in to your admin panel to provide a quote.",
+            $siteName,
+            "business"
+        );
     }
 
     private static function buildBusinessUserBody(string $name, string $siteName): string {
@@ -151,6 +210,24 @@ class EmailQueue {
             $siteName,
             "business"
         );
+    }
+
+    /**
+     * Helper to render a clean HTML table for admin emails
+     */
+    private static function renderAdminTable(string $title, array $data): string {
+        $html = '<table width="100%" cellpadding="10" cellspacing="0" style="border-collapse: collapse; margin: 20px 0; border: 1px solid #e2e8f0; font-size: 14px;">';
+        $html .= '<tr style="background: #f8fafc;"><th colspan="2" style="text-align: left; border-bottom: 2px solid #e2e8f0;">' . htmlspecialchars($title) . '</th></tr>';
+        
+        foreach ($data as $label => $value) {
+            $html .= '<tr>';
+            $html .= '<td width="35%" style="font-weight: bold; border-bottom: 1px solid #e2e8f0; color: #64748b; background: #fdfdfd;">' . htmlspecialchars($label) . '</td>';
+            $html .= '<td style="border-bottom: 1px solid #e2e8f0; color: #1e293b;">' . nl2br(htmlspecialchars((string)$value)) . '</td>';
+            $html .= '</tr>';
+        }
+        
+        $html .= '</table>';
+        return $html;
     }
 
     /**
@@ -195,7 +272,7 @@ class EmailQueue {
                         <td style="padding:36px 32px;">
                             <h1 style="margin:0 0 20px 0;font-size:20px;font-weight:700;color:' . $textDark . ';">' . htmlspecialchars($title) . '</h1>
                             <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:' . $textDark . ';">' . $greeting . '</p>
-                            <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:' . $textDark . ';">' . htmlspecialchars($message1) . '</p>
+                            <div style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:' . $textDark . ';">' . $message1 . '</div>
                             <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;color:' . $textMuted . ';">' . htmlspecialchars($message2) . '</p>
                             <div style="height:1px;background:#e2e8f0;margin:0 0 24px 0;"></div>
                             <p style="margin:0;font-size:14px;color:' . $textMuted . ';">Best regards,<br><strong style="color:' . $primary . ';">' . htmlspecialchars($siteName) . '</strong></p>

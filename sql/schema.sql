@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS `visits` (
     UNIQUE KEY `unique_visit` (`ip_address`, `visit_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- =============================================
 -- Email Queue
+-- Successfully sent emails are automatically removed from this table
 -- =============================================
 
 CREATE TABLE IF NOT EXISTS `email_queue` (
