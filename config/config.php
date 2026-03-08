@@ -11,6 +11,7 @@ define('API_SECRET', 'your_secret_key_here'); // Change this for production
 // Email Configuration (for queue notifications)
 define('ADMIN_EMAIL', 'ayushsolanki2901@gmail.com');
 define('SITE_NAME', 'Speedy Laundry');
+define('CLIENT_URL', 'http://localhost:3000'); // Change this for production, e.g. https://speedylaundry.co.uk
 
 // SMTP (PHPMailer) - leave empty to use PHP mail()
 define('SMTP_HOST', 'smtp.gmail.com');           // e.g. smtp.gmail.com

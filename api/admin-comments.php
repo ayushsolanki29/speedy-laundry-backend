@@ -32,7 +32,7 @@ try {
             // Otherwise get all recent comments for the moderation panel
             if (isset($_GET['blog_id'])) {
                 $stmt = $db->prepare("
-                    SELECT c.*, b.title as blog_title 
+                    SELECT c.*, b.title as blog_title, b.slug as blog_slug
                     FROM blog_comments c 
                     JOIN blogs b ON c.blog_id = b.id 
                     WHERE c.blog_id = ? 
@@ -41,7 +41,7 @@ try {
                 $stmt->execute([(int)$_GET['blog_id']]);
             } else {
                 $stmt = $db->query("
-                    SELECT c.*, b.title as blog_title 
+                    SELECT c.*, b.title as blog_title, b.slug as blog_slug
                     FROM blog_comments c 
                     JOIN blogs b ON c.blog_id = b.id 
                     ORDER BY c.created_at DESC

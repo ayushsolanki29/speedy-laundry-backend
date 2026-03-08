@@ -71,7 +71,7 @@ function buildAdminReplyHtml(string $name, string $message, string $siteName): s
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
                     <tr>
                         <td style="background:' . $primary . ';padding:28px 32px;text-align:center;">
-                            <p style="margin:0 0 8px 0;font-size:36px;line-height:1;">🧺</p>
+                            <img src="' . (defined('CLIENT_URL') ? rtrim(CLIENT_URL, '/') : 'https://speedylaundry.co.uk') . '/assets/logo-white.svg" alt="Speedy Laundry" width="160" style="display:block; margin: 0 auto 12px auto;" />
                             <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;">' . htmlspecialchars($siteName) . '</p>
                         </td>
                     </tr>
