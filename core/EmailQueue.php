@@ -263,7 +263,6 @@ class EmailQueue {
                     <tr>
                         <td style="background:' . $primary . ';padding:28px 32px;text-align:center;">
                             <img src="' . (defined('CLIENT_URL') ? rtrim(CLIENT_URL, '/') : 'https://speedylaundry.co.uk') . '/assets/logo-white.svg" alt="Speedy Laundry" width="160" style="display:block; margin: 0 auto 12px auto;" />
-                            <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:-0.02em;">' . htmlspecialchars($siteName) . '</p>
                         </td>
                     </tr>
                     <!-- Content -->
