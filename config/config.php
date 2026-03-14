@@ -1,4 +1,8 @@
 <?php
+// Timezone (client is UK/London)
+define('APP_TIMEZONE', getenv('APP_TIMEZONE') ?: 'Europe/London');
+date_default_timezone_set(APP_TIMEZONE);
+
 // Database Configuration
 // define('DB_HOST', 'localhost');
 // define('DB_USER', 'u344107577_speedy_user');
