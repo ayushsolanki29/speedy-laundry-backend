@@ -64,6 +64,11 @@ try {
         LIMIT 50
     ")->fetchAll(PDO::FETCH_ASSOC);
 
+    foreach ($recent_logs as &$log) {
+        $log['created_at_iso'] = toUtcIso($log['created_at'] ?? null);
+    }
+    unset($log);
+
     sendResponse('success', 'Footfall stats fetched', [
         'total_visits' => (int)$total_visits,
         'visits_today' => (int)$visits_today,

@@ -15,6 +15,10 @@ try {
     // 1. Enquiries Section
     $stmt = $db->query("SELECT id, full_name, service, created_at FROM enquiries WHERE status = 'new' ORDER BY created_at DESC LIMIT 5");
     $recentEnquiries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($recentEnquiries as &$e) {
+        $e['created_at_iso'] = toUtcIso($e['created_at'] ?? null);
+    }
+    unset($e);
 
     $countStmt = $db->query("SELECT COUNT(*) as unread_count FROM enquiries WHERE status = 'new'");
     $enquiryCount = $countStmt->fetch(PDO::FETCH_ASSOC)['unread_count'];
@@ -47,6 +51,11 @@ try {
         return strtotime($b['created_at']) - strtotime($a['created_at']);
     });
     $blogActivity = array_slice($blogActivity, 0, 8); // Top 8 combined
+
+    foreach ($blogActivity as &$b) {
+        $b['created_at_iso'] = toUtcIso($b['created_at'] ?? null);
+    }
+    unset($b);
 
     // Counts
     // Unreplied comments might be considered 'unread'

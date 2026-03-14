@@ -30,6 +30,12 @@ try {
                                 AND type NOT LIKE '%_admin'
                                 ORDER BY created_at DESC");
             $queue = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($queue as &$item) {
+                $item['created_at_iso'] = toUtcIso($item['created_at'] ?? null);
+                $item['sent_at_iso'] = toUtcIso($item['sent_at'] ?? null);
+            }
+            unset($item);
             
             // Get simplified stats
             $countStmt = $db->query("SELECT COUNT(*) FROM email_queue WHERE status = 'pending' AND type NOT LIKE '%_admin'");

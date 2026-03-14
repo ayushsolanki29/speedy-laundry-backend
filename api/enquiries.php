@@ -16,6 +16,12 @@ try {
     $stmt = $db->query("SELECT * FROM enquiries ORDER BY created_at DESC");
     $enquiries = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    foreach ($enquiries as &$enquiry) {
+        $enquiry['created_at_iso'] = toUtcIso($enquiry['created_at'] ?? null);
+        $enquiry['updated_at_iso'] = toUtcIso($enquiry['updated_at'] ?? null);
+    }
+    unset($enquiry);
+
     sendResponse('success', 'Enquiries fetched successfully', $enquiries);
     
 } catch (Exception $e) {

@@ -48,6 +48,10 @@ try {
                 ");
             }
             $comments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($comments as &$c) {
+                $c['created_at_iso'] = toUtcIso($c['created_at'] ?? null);
+            }
+            unset($c);
             sendResponse('success', 'Comments fetched', $comments);
             break;
 

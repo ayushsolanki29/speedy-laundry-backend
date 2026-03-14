@@ -34,11 +34,22 @@ try {
                 $stmt = $db->prepare("SELECT * FROM blogs WHERE id = ?");
                 $stmt->execute([(int)$_GET['id']]);
                 $blog = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($blog) {
+                    $blog['created_at_iso'] = toUtcIso($blog['created_at'] ?? null);
+                    $blog['updated_at_iso'] = toUtcIso($blog['updated_at'] ?? null);
+                    $blog['published_at_iso'] = toUtcIso($blog['published_at'] ?? null);
+                }
                 sendResponse('success', 'Blog fetched', $blog);
             } else {
                 // List all
                 $stmt = $db->query("SELECT b.*, a.username as author_name FROM blogs b LEFT JOIN admins a ON b.author_id = a.id ORDER BY b.created_at DESC");
                 $blogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($blogs as &$b) {
+                    $b['created_at_iso'] = toUtcIso($b['created_at'] ?? null);
+                    $b['updated_at_iso'] = toUtcIso($b['updated_at'] ?? null);
+                    $b['published_at_iso'] = toUtcIso($b['published_at'] ?? null);
+                }
+                unset($b);
                 sendResponse('success', 'Blogs fetched', $blogs);
             }
             break;

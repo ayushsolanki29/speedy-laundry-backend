@@ -25,6 +25,24 @@ function sanitizeInput($data) {
 }
 
 /**
+ * Convert a DB datetime string (assumed in APP_TIMEZONE) to a UTC ISO-8601 string.
+ * Helps the frontend avoid ambiguous Date parsing.
+ */
+function toUtcIso(?string $dateTimeString): ?string {
+    if (!$dateTimeString) return null;
+
+    $sourceTz = defined('APP_TIMEZONE') ? APP_TIMEZONE : 'UTC';
+    try {
+        $dt = new DateTime($dateTimeString, new DateTimeZone($sourceTz));
+        $dt->setTimezone(new DateTimeZone('UTC'));
+        // Use Z so JS parses consistently as UTC
+        return $dt->format('Y-m-d\\TH:i:s\\Z');
+    } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
  * Get Bearer Token from Header
  */
 function getBearerToken() {

@@ -22,6 +22,8 @@ try {
     $enquiry = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($enquiry) {
+        $enquiry['created_at_iso'] = toUtcIso($enquiry['created_at'] ?? null);
+        $enquiry['updated_at_iso'] = toUtcIso($enquiry['updated_at'] ?? null);
         sendResponse('success', 'Enquiry fetched successfully', $enquiry);
     } else {
         sendResponse('error', 'Enquiry not found', null, 404);
