@@ -13,6 +13,48 @@ class Mailer {
 
     /** Last error message when send fails (for debugging) */
     public static $lastError = '';
+    private static $sentWarned = false;
+
+    private static function appendToSent(PHPMailer $mail): void {
+        if (!defined('MAIL_APPEND_TO_SENT') || !MAIL_APPEND_TO_SENT) {
+            return;
+        }
+        if (!function_exists('imap_open') || !function_exists('imap_append')) {
+            if (!self::$sentWarned) {
+                self::$sentWarned = true;
+                error_log('Mailer: IMAP extension is not enabled; cannot append sent message to Sent folder.');
+            }
+            return;
+        }
+        if (!defined('IMAP_HOST') || !defined('IMAP_PORT') || !defined('IMAP_FLAGS')) {
+            return;
+        }
+        $imapUser = defined('IMAP_USER') ? (string)IMAP_USER : '';
+        $imapPass = defined('IMAP_PASS') ? (string)IMAP_PASS : '';
+        if (trim($imapUser) === '' || trim($imapPass) === '') {
+            return;
+        }
+
+        $server = '{' . IMAP_HOST . ':' . (int)IMAP_PORT . IMAP_FLAGS . '}';
+        $inboxMailbox = $server . 'INBOX';
+        $sentFolder = defined('IMAP_SENT_FOLDER') ? trim((string)IMAP_SENT_FOLDER) : 'Sent';
+        $sentMailbox = $server . ($sentFolder !== '' ? $sentFolder : 'Sent');
+
+        $imap = @imap_open($inboxMailbox, $imapUser, $imapPass);
+        if ($imap === false) {
+            error_log('Mailer IMAP open failed: ' . (function_exists('imap_last_error') ? (imap_last_error() ?: '') : 'unknown error'));
+            return;
+        }
+
+        $mime = $mail->getSentMIMEMessage();
+        if ($mime !== '') {
+            $ok = @imap_append($imap, $sentMailbox, $mime, '\\Seen');
+            if ($ok === false) {
+                error_log('Mailer IMAP append failed: ' . (function_exists('imap_last_error') ? (imap_last_error() ?: '') : 'unknown error'));
+            }
+        }
+        imap_close($imap);
+    }
 
     /**
      * Send an email. Returns true on success.
@@ -20,7 +62,10 @@ class Mailer {
      */
     public static function send(string $toEmail, string $subject, string $body, ?string $toName = null, bool $isHtml = false): bool {
         self::$lastError = '';
-        $fromEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'noreply@speedylaundry.co.uk';
+        $fromEmail =
+            (defined('MAIL_FROM') && trim((string)MAIL_FROM) !== '') ? MAIL_FROM :
+            ((defined('SMTP_USER') && trim((string)SMTP_USER) !== '') ? SMTP_USER :
+            ((defined('ADMIN_EMAIL') && trim((string)ADMIN_EMAIL) !== '') ? ADMIN_EMAIL : 'noreply@speedylaundry.co.uk'));
         $fromName = defined('SITE_NAME') ? SITE_NAME : 'Speedy Laundry';
 
         $mail = new PHPMailer(true);
@@ -59,6 +104,7 @@ class Mailer {
             }
 
             $mail->send();
+            self::appendToSent($mail);
             return true;
         } catch (Exception $e) {
             self::$lastError = $mail->ErrorInfo ?: $e->getMessage();

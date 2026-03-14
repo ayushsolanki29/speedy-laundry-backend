@@ -23,11 +23,12 @@ if (!$input) {
 $full_name = sanitizeInput($input['full_name'] ?? '');
 $phone = sanitizeInput($input['phone'] ?? '');
 $email = sanitizeInput($input['email'] ?? '');
+$address = sanitizeInput($input['address'] ?? '');
 $postcode = sanitizeInput($input['postcode'] ?? '');
 $service = sanitizeInput($input['service'] ?? '');
 $message = sanitizeInput($input['message'] ?? '');
 
-if (empty($full_name) || empty($phone) || empty($email) || empty($postcode)) {
+if (empty($full_name) || empty($phone) || empty($email) || empty($address) || empty($postcode)) {
     sendResponse('error', 'Please fill in all required fields.', null, 400);
 }
 
@@ -43,11 +44,28 @@ if (strlen($postcode) > 20) {
     sendResponse('error', 'Postcode is too long (max 20 characters).', null, 400);
 }
 
+$address = preg_replace('/\s+/', ' ', $address);
+if (strlen($address) > 255) {
+    sendResponse('error', 'Address is too long (max 255 characters).', null, 400);
+}
+
+$messageToSave = trim("ADDRESS: {$address}\n\n" . ($message ?: ''));
+
 try {
     $db = Database::getInstance()->getConnection();
-    
-    $stmt = $db->prepare("INSERT INTO enquiries (full_name, phone, email, postcode, service, message) VALUES (?, ?, ?, ?, ?, ?)");
-    $result = $stmt->execute([$full_name, $phone, $email, $postcode, $service, $message]);
+
+    try {
+        $stmt = $db->prepare("INSERT INTO enquiries (full_name, phone, email, address, postcode, service, message) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $result = $stmt->execute([$full_name, $phone, $email, $address, $postcode, $service, $messageToSave]);
+    } catch (PDOException $e) {
+        // Backwards-compatible fallback for older schemas (no address column)
+        if ($e->getCode() === '42S22') {
+            $stmt = $db->prepare("INSERT INTO enquiries (full_name, phone, email, postcode, service, message) VALUES (?, ?, ?, ?, ?, ?)");
+            $result = $stmt->execute([$full_name, $phone, $email, $postcode, $service, $messageToSave]);
+        } else {
+            throw $e;
+        }
+    }
 
     if ($result) {
         $enquiryId = $db->lastInsertId();
@@ -55,6 +73,7 @@ try {
             'full_name' => $full_name,
             'email' => $email,
             'phone' => $phone,
+            'address' => $address,
             'postcode' => $postcode,
             'service' => $service,
             'message' => $message

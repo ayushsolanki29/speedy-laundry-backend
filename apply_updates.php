@@ -13,6 +13,19 @@ try {
     $db = Database::getInstance()->getConnection();
     echo "Connected to database successfully.\n";
 
+    $addColumnIfMissing = function (string $table, string $columnDef, string $columnName) use ($db) {
+        try {
+            $db->exec("ALTER TABLE `$table` ADD COLUMN $columnDef");
+            echo "Column $columnName added to $table.\n";
+        } catch (PDOException $e) {
+            if ($e->getCode() == '42S21') {
+                echo "Column $columnName already exists in $table.\n";
+            } else {
+                throw $e;
+            }
+        }
+    };
+
     // 1. Create blog_likes and blog_comments if not exist
     $db->exec("CREATE TABLE IF NOT EXISTS `blog_likes` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -99,7 +112,7 @@ try {
 
     $count = (int) $db->query("SELECT COUNT(*) FROM reviews")->fetchColumn();
     if ($count === 0) {
-        $seedFile = __DIR__ . '/../sql/seed-reviews.sql';
+        $seedFile = __DIR__ . '/sql/seed-reviews.sql';
         if (file_exists($seedFile)) {
             $sql = file_get_contents($seedFile);
             $db->exec($sql);
@@ -107,17 +120,10 @@ try {
         }
     }
 
-    // 5. Add is_html to email_queue (for very old installs that created table without it)
-    try {
-        $db->exec("ALTER TABLE `email_queue` ADD COLUMN `is_html` TINYINT UNSIGNED DEFAULT 0");
-        echo "email_queue is_html column added.\n";
-    } catch (PDOException $e) {
-        if ($e->getCode() == '42S21') {
-            echo "email_queue is_html column already exists.\n";
-        } else {
-            throw $e;
-        }
-    }
+    // 6. Enquiries: add new fields
+    $addColumnIfMissing('enquiries', "`address` VARCHAR(255) NULL AFTER `email`", 'address');
+    $addColumnIfMissing('enquiries', "`business_name` VARCHAR(150) NULL AFTER `service`", 'business_name');
+    $addColumnIfMissing('enquiries', "`industry` VARCHAR(100) NULL AFTER `business_name`", 'industry');
 
     echo "All updates applied successfully.\n";
 

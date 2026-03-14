@@ -91,6 +91,7 @@ class EmailQueue {
         $name = $data['full_name'] ?? '';
         $email = $data['email'] ?? '';
         $phone = $data['phone'] ?? '';
+        $address = $data['address'] ?? '';
         $postcode = $data['postcode'] ?? '';
         $service = $data['service'] ?? '';
         $message = $data['message'] ?? '';
@@ -99,7 +100,7 @@ class EmailQueue {
 
         // Admin: New submission (HTML Table)
         $adminSubject = "[{$siteName}] New Pickup Enquiry from {$name}";
-        $adminBody = self::buildEnquiryAdminHtml($name, $email, $phone, $postcode, $service, $message, $siteName);
+        $adminBody = self::buildEnquiryAdminHtml($name, $email, $phone, $address, $postcode, $service, $message, $siteName);
         self::push($adminEmail, $adminSubject, $adminBody, 'enquiry_admin', null, true);
 
         // User: Confirmation (HTML)
@@ -116,6 +117,7 @@ class EmailQueue {
         $name = $data['full_name'] ?? '';
         $email = $data['email'] ?? '';
         $phone = $data['phone'] ?? '';
+        $address = $data['address'] ?? '';
         $industry = $data['industry'] ?? '';
         $message = $data['message'] ?? '';
         $siteName = defined('SITE_NAME') ? SITE_NAME : 'Speedy Laundry';
@@ -123,7 +125,7 @@ class EmailQueue {
 
         // Admin: New business submission (HTML Table)
         $adminSubject = "[{$siteName}] New Business Quote Request from {$businessName}";
-        $adminBody = self::buildBusinessAdminHtml($businessName, $name, $email, $phone, $industry, $message, $siteName);
+        $adminBody = self::buildBusinessAdminHtml($businessName, $name, $email, $phone, $address, $industry, $message, $siteName);
         self::push($adminEmail, $adminSubject, $adminBody, 'business_admin', null, true);
 
         // User: Confirmation (HTML)
@@ -132,26 +134,23 @@ class EmailQueue {
         self::push($email, $userSubject, $userBody, 'business_user', $name, true);
     }
 
-    private static function buildEnquiryAdminHtml(string $name, string $email, string $phone, string $postcode, string $service, string $message, string $siteName): string {
+    private static function buildEnquiryAdminHtml(string $name, string $email, string $phone, string $address, string $postcode, string $service, string $message, string $siteName): string {
         $rows = [
             'Name' => $name,
             'Email' => $email,
             'Phone' => $phone,
+            'Address' => $address ?: 'Not specified',
             'Postcode' => $postcode,
             'Service' => $service ?: 'Not specified',
             'Message' => $message ?: '(No message)'
         ];
         
         $tableHtml = self::renderAdminTable("New Pickup Enquiry", $rows);
-        
-        return self::wrapHtmlEmail(
-            "New Pickup Submission",
-            "A new pickup enquiry has been received from the website.",
-            $tableHtml,
-            "Please log in to your admin panel to respond.",
-            $siteName,
-            "enquiry"
-        );
+
+        // Admin emails: keep HTML minimal (storage-friendly)
+        return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head><body>'
+            . $tableHtml
+            . '</body></html>';
     }
 
     private static function buildEnquiryUserBody(string $name, string $siteName): string {
@@ -172,26 +171,23 @@ class EmailQueue {
         );
     }
 
-    private static function buildBusinessAdminHtml(string $business, string $name, string $email, string $phone, string $industry, string $message, string $siteName): string {
+    private static function buildBusinessAdminHtml(string $business, string $name, string $email, string $phone, string $address, string $industry, string $message, string $siteName): string {
         $rows = [
             'Business' => $business,
             'Contact' => $name,
             'Email' => $email,
             'Phone' => $phone,
+            'Address' => $address ?: 'Not specified',
             'Industry' => $industry ?: 'Not specified',
             'Message' => $message ?: '(No message)'
         ];
 
         $tableHtml = self::renderAdminTable("New Business Quote Request", $rows);
 
-        return self::wrapHtmlEmail(
-            "Business Quote Request",
-            "A new professional laundry request has been received from the website.",
-            $tableHtml,
-            "Please log in to your admin panel to provide a quote.",
-            $siteName,
-            "business"
-        );
+        // Admin emails: keep HTML minimal (storage-friendly)
+        return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"></head><body>'
+            . $tableHtml
+            . '</body></html>';
     }
 
     private static function buildBusinessUserBody(string $name, string $siteName): string {
@@ -246,6 +242,9 @@ class EmailQueue {
         $textDark = '#1e293b';
         $textMuted = '#64748b';
         $lightBg = '#f8fafc';
+        $logoUrl = (defined('MAIL_LOGO_URL') && trim((string)MAIL_LOGO_URL) !== '')
+            ? (string)MAIL_LOGO_URL
+            : ((defined('CLIENT_URL') ? rtrim(CLIENT_URL, '/') : 'https://speedylaundry.co.uk') . '/assets/logo-white.svg');
 
         return '<!DOCTYPE html>
 <html lang="en">
@@ -262,7 +261,7 @@ class EmailQueue {
                     <!-- Header -->
                     <tr>
                         <td style="background:' . $primary . ';padding:28px 32px;text-align:center;">
-                            <img src="' . (defined('CLIENT_URL') ? rtrim(CLIENT_URL, '/') : 'https://speedylaundry.co.uk') . '/assets/logo-white.svg" alt="Speedy Laundry" width="160" style="display:block; margin: 0 auto 12px auto;" />
+                            <img src="' . htmlspecialchars($logoUrl) . '" alt="Speedy Laundry" width="160" style="display:block; margin: 0 auto 12px auto;" />
                         </td>
                     </tr>
                     <!-- Content -->

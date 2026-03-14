@@ -13,11 +13,19 @@ Emails are processed asynchronously via the queue (non-blocking, faster response
 3. Configure SMTP in `backend/config/config.php`:
 
 ```php
-define('SMTP_HOST', 'smtp.gmail.com');
-define('SMTP_PORT', 587);
-define('SMTP_SECURE', 'tls');
-define('SMTP_USER', 'your@gmail.com');
-define('SMTP_PASS', 'your-app-password');  // Gmail: use App Password, not main password
+define('MAIL_FROM', 'info@speedylaundry.co.uk');
+define('SMTP_HOST', 'smtp.hostinger.com');
+define('SMTP_PORT', 465);
+define('SMTP_SECURE', 'ssl');
+define('SMTP_USER', 'info@speedylaundry.co.uk');
+define('SMTP_PASS', getenv('SMTP_PASS') ?: '');
+
+// Optional: save outgoing emails into the mailbox "Sent"
+define('MAIL_APPEND_TO_SENT', true);
+define('IMAP_HOST', 'imap.hostinger.com');
+define('IMAP_PORT', 993);
+define('IMAP_FLAGS', '/imap/ssl');
+define('IMAP_SENT_FOLDER', 'Sent');
 ```
 
 Leave `SMTP_HOST` empty to use PHP `mail()`.
