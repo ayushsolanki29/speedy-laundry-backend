@@ -60,7 +60,7 @@ class Mailer {
      * Send an email. Returns true on success.
      * @param bool $isHtml When true, body is HTML; otherwise plain text
      */
-    public static function send(string $toEmail, string $subject, string $body, ?string $toName = null, bool $isHtml = false): bool {
+    public static function send(string $toEmail, string $subject, string $body, ?string $toName = null, bool $isHtml = false, ?string $replyTo = null, ?string $replyToName = null): bool {
         self::$lastError = '';
         $fromEmail =
             (defined('MAIL_FROM') && trim((string)MAIL_FROM) !== '') ? MAIL_FROM :
@@ -75,7 +75,7 @@ class Mailer {
             $mail->Encoding = 'base64';
             $mail->setFrom($fromEmail, $fromName);
             $mail->addAddress($toEmail, $toName ?? '');
-            $mail->addReplyTo($fromEmail, $fromName);
+            $mail->addReplyTo($replyTo ?: $fromEmail, $replyToName ?: $fromName);
             $mail->Subject = $subject;
             $mail->Body = $body;
             $mail->isHTML($isHtml);

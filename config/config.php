@@ -9,6 +9,7 @@ date_default_timezone_set(APP_TIMEZONE);
 // define('DB_PASS', 'ThisLostGost@^57777');
 // define('DB_NAME', 'u344107577_speedy_db');
 // define('CLIENT_URL', 'https://speedylaundry.co.uk');
+
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');

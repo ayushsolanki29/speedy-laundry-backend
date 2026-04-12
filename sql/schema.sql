@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS `email_queue` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `to_email` VARCHAR(255) NOT NULL,
     `to_name` VARCHAR(100),
+    `reply_to` VARCHAR(255) DEFAULT NULL,
+    `reply_to_name` VARCHAR(100) DEFAULT NULL,
     `subject` VARCHAR(255) NOT NULL,
     `body` TEXT NOT NULL,
     `type` ENUM('enquiry_admin', 'enquiry_user', 'business_admin', 'business_user') NOT NULL,

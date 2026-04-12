@@ -13,15 +13,17 @@ class EmailQueue {
      * Queue an email. Returns true on success.
      * @param bool $isHtml When true, body is HTML
      */
-    public static function push(string $toEmail, string $subject, string $body, string $type, ?string $toName = null, bool $isHtml = false, int $maxAttempts = 3): bool {
+    public static function push(string $toEmail, string $subject, string $body, string $type, ?string $toName = null, bool $isHtml = false, ?string $replyTo = null, ?string $replyToName = null, int $maxAttempts = 3): bool {
         try {
             $db = Database::getInstance()->getConnection();
             $stmt = $db->prepare(
-                "INSERT INTO email_queue (to_email, to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO email_queue (to_email, to_name, reply_to, reply_to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
             return $stmt->execute([
                 trim($toEmail),
                 $toName ? trim($toName) : null,
+                $replyTo ? trim($replyTo) : null,
+                $replyToName ? trim($replyToName) : null,
                 trim($subject),
                 $body,
                 $type,
@@ -60,7 +62,9 @@ class EmailQueue {
                     $email['subject'],
                     $email['body'],
                     $email['to_name'],
-                    (int)$email['is_html'] === 1
+                    (int)$email['is_html'] === 1,
+                    $email['reply_to'],
+                    $email['reply_to_name']
                 );
 
                 if ($success) {
@@ -101,12 +105,12 @@ class EmailQueue {
         // Admin: New submission (HTML Table)
         $adminSubject = "[{$siteName}] New Pickup Enquiry from {$name}";
         $adminBody = self::buildEnquiryAdminHtml($name, $email, $phone, $address, $postcode, $service, $message, $siteName);
-        self::push($adminEmail, $adminSubject, $adminBody, 'enquiry_admin', null, true);
+        self::push($adminEmail, $adminSubject, $adminBody, 'enquiry_admin', null, true, $email, $name);
 
         // User: Confirmation (HTML)
         $userSubject = "Your submission received – {$siteName}";
         $userBody = self::buildEnquiryUserHtml($name, $siteName);
-        self::push($email, $userSubject, $userBody, 'enquiry_user', $name, true);
+        self::push($email, $userSubject, $userBody, 'enquiry_user', $name, true, $adminEmail, $siteName);
     }
 
     /**
@@ -126,12 +130,12 @@ class EmailQueue {
         // Admin: New business submission (HTML Table)
         $adminSubject = "[{$siteName}] New Business Quote Request from {$businessName}";
         $adminBody = self::buildBusinessAdminHtml($businessName, $name, $email, $phone, $address, $industry, $message, $siteName);
-        self::push($adminEmail, $adminSubject, $adminBody, 'business_admin', null, true);
+        self::push($adminEmail, $adminSubject, $adminBody, 'business_admin', null, true, $email, $name);
 
         // User: Confirmation (HTML)
         $userSubject = "Your business request received – {$siteName}";
         $userBody = self::buildBusinessUserHtml($name, $siteName);
-        self::push($email, $userSubject, $userBody, 'business_user', $name, true);
+        self::push($email, $userSubject, $userBody, 'business_user', $name, true, $adminEmail, $siteName);
     }
 
     private static function buildEnquiryAdminHtml(string $name, string $email, string $phone, string $address, string $postcode, string $service, string $message, string $siteName): string {
