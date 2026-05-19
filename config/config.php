@@ -34,13 +34,27 @@ define('MAIL_LOGO_URL', getenv('MAIL_LOGO_URL') ?: 'https://server.speedylaundry
 // Outgoing (SMTP): smtp.hostinger.com:465 SSL/TLS
 // Incoming (POP):  pop.hostinger.com:995 SSL/TLS
 
-// SMTP (PHPMailer) - leave empty to use PHP mail()
+// SMTP (PHPMailer) - SMTP is mandatory; PHP mail() fallback has been removed.
+// All outbound email goes through smtp.hostinger.com to avoid blacklisted shared-hosting IPs.
 define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.hostinger.com');
 define('SMTP_PORT', (int)(getenv('SMTP_PORT') ?: 465)); // 587=tls, 465=ssl
 define('SMTP_SECURE', getenv('SMTP_SECURE') ?: 'ssl');  // 'tls' for 587, 'ssl' for 465
 define('SMTP_USER', getenv('SMTP_USER') ?: 'info@speedylaundry.co.uk');
 define('SMTP_PASS', getenv('SMTP_PASS') ?: 'ThisLostGost@^57777');         // Set your mailbox/app password in env
-define('SMTP_DEBUG', false);                       // Set true to see SMTP conversation in CLI
+define('SMTP_DEBUG', false);                       // Set true to see full SMTP conversation in error log
+
+// ── Mail Activity Log ────────────────────────────────────────────────────────
+// MAIL_LOG          true  = write a human-readable line to MAIL_LOG_PATH for
+//                           every send attempt (success AND failure).
+//                   false = silent (no log file written).
+// MAIL_LOG_PATH     Absolute path to the log file.
+//                   Directory must be writable by the web server.
+// MAIL_LOG_SMTP     true  = also dump the full SMTP dialogue into the log
+//                           (very verbose; useful only while debugging).
+//                   false = log summary lines only.
+define('MAIL_LOG',       true);
+define('MAIL_LOG_PATH',  __DIR__ . '/../logs/mail.log');
+define('MAIL_LOG_SMTP',  false);  // flip to true for deep SMTP debugging
 
 // Save sent messages into mailbox "Sent" (so Hostinger webmail shows them under Sent)
 define('MAIL_APPEND_TO_SENT', (getenv('MAIL_APPEND_TO_SENT') ?: '1') === '1');

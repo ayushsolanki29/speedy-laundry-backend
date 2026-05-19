@@ -1,0 +1,4 @@
+vendor/
+logs/*.log
+uploads/reviews/*
+!uploads/reviews/.gitkeep
