@@ -82,6 +82,10 @@ try {
             'industry' => $industry,
             'message' => $message
         ]);
+        // Process the queue immediately so emails are sent on every submission.
+        // This avoids relying on a cron job that may not be configured on the host.
+        require_once __DIR__ . '/../core/Mailer.php';
+        EmailQueue::process(10);
         sendResponse('success', 'Thank you! Your business quote request has been received. Our team will contact you shortly.', [
             'id' => $enquiryId
         ]);

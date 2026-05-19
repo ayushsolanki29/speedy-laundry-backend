@@ -1,4 +1,10 @@
 <?php
+// Buffer all output from the start so PHP notices/warnings never corrupt JSON responses.
+// sendResponse() in functions.php cleans this buffer before writing JSON.
+if (!ob_get_level()) {
+    ob_start();
+}
+
 // Timezone (client is UK/London)
 define('APP_TIMEZONE', getenv('APP_TIMEZONE') ?: 'Europe/London');
 date_default_timezone_set(APP_TIMEZONE);
@@ -57,13 +63,16 @@ define('MAIL_LOG_PATH',  __DIR__ . '/../logs/mail.log');
 define('MAIL_LOG_SMTP',  false);  // flip to true for deep SMTP debugging
 
 // Save sent messages into mailbox "Sent" (so Hostinger webmail shows them under Sent)
-define('MAIL_APPEND_TO_SENT', (getenv('MAIL_APPEND_TO_SENT') ?: '1') === '1');
+// DISABLED: Hostinger IMAP append causes PHP shutdown notices that corrupt JSON responses.
+// To re-enable, fix the IMAP folder path and set MAIL_APPEND_TO_SENT=1 as an env var.
+define('MAIL_APPEND_TO_SENT', false);
 define('IMAP_HOST', getenv('IMAP_HOST') ?: 'imap.hostinger.com');
 define('IMAP_PORT', (int)(getenv('IMAP_PORT') ?: 993));
-define('IMAP_FLAGS', getenv('IMAP_FLAGS') ?: '/imap/ssl'); // e.g. /imap/ssl/novalidate-cert
+define('IMAP_FLAGS', getenv('IMAP_FLAGS') ?: '/imap/ssl');
 define('IMAP_USER', getenv('IMAP_USER') ?: (defined('SMTP_USER') ? SMTP_USER : ''));
 define('IMAP_PASS', getenv('IMAP_PASS') ?: (defined('SMTP_PASS') ? SMTP_PASS : ''));
-define('IMAP_SENT_FOLDER', getenv('IMAP_SENT_FOLDER') ?: 'Sent');
+// Hostinger stores subfolders under INBOX — use 'INBOX.Sent' not just 'Sent'
+define('IMAP_SENT_FOLDER', getenv('IMAP_SENT_FOLDER') ?: 'INBOX.Sent');
 
 // Upload base URL for review photos - must be web-accessible (e.g. http://localhost/speedy-laundry/backend)
 define('UPLOAD_BASE_URL', 'http://localhost/speedy-laundry/backend');

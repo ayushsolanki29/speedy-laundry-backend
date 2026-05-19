@@ -16,22 +16,71 @@ class EmailQueue {
     public static function push(string $toEmail, string $subject, string $body, string $type, ?string $toName = null, bool $isHtml = false, ?string $replyTo = null, ?string $replyToName = null, int $maxAttempts = 3): bool {
         try {
             $db = Database::getInstance()->getConnection();
-            $stmt = $db->prepare(
-                "INSERT INTO email_queue (to_email, to_name, reply_to, reply_to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            );
-            return $stmt->execute([
-                trim($toEmail),
-                $toName ? trim($toName) : null,
-                $replyTo ? trim($replyTo) : null,
-                $replyToName ? trim($replyToName) : null,
-                trim($subject),
-                $body,
-                $type,
-                $isHtml ? 1 : 0,
-                $maxAttempts
-            ]);
+
+            // Detect whether the reply_to columns exist (live DB may be on older schema)
+            $hasReplyTo = self::columnExists($db, 'email_queue', 'reply_to');
+
+            if ($hasReplyTo) {
+                $stmt = $db->prepare(
+                    "INSERT INTO email_queue (to_email, to_name, reply_to, reply_to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                );
+                $params = [
+                    trim($toEmail),
+                    $toName ? trim($toName) : null,
+                    $replyTo ? trim($replyTo) : null,
+                    $replyToName ? trim($replyToName) : null,
+                    trim($subject),
+                    $body,
+                    $type,
+                    $isHtml ? 1 : 0,
+                    $maxAttempts
+                ];
+            } else {
+                // Fallback for older schema without reply_to columns
+                self::writeQueueLog('SCHEMA', 'reply_to columns missing — using compact INSERT. Run ALTER TABLE to add them.');
+                $stmt = $db->prepare(
+                    "INSERT INTO email_queue (to_email, to_name, subject, body, type, is_html, max_attempts) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                );
+                $params = [
+                    trim($toEmail),
+                    $toName ? trim($toName) : null,
+                    trim($subject),
+                    $body,
+                    $type,
+                    $isHtml ? 1 : 0,
+                    $maxAttempts
+                ];
+            }
+
+            $result = $stmt->execute($params);
+
+            if (!$result) {
+                $info = implode(' | ', $stmt->errorInfo());
+                error_log("EmailQueue push failed for type={$type} to={$toEmail}: {$info}");
+                self::writeQueueLog('PUSH_FAIL', "INSERT failed for type={$type} to={$toEmail} subject=\"{$subject}\" — DB error: {$info}");
+                return false;
+            }
+
+            self::writeQueueLog('QUEUED', "Queued type={$type} to={$toEmail} subject=\"{$subject}\"");
+            return true;
+
         } catch (Exception $e) {
             error_log("EmailQueue push error: " . $e->getMessage());
+            self::writeQueueLog('PUSH_FAIL', "Exception for type={$type} to={$toEmail}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check whether a column exists in a table.
+     */
+    private static function columnExists(\PDO $db, string $table, string $column): bool
+    {
+        try {
+            $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $stmt->execute([$column]);
+            return $stmt->rowCount() > 0;
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -56,7 +105,13 @@ class EmailQueue {
             $stmt->execute();
             $emails = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            if (empty($emails)) {
+                self::writeQueueLog('QUEUE', 'No pending emails found in queue.');
+            }
+
             foreach ($emails as $email) {
+                self::writeQueueLog('ATTEMPT', "Sending queued email id={$email['id']} type={$email['type']} to={$email['to_email']} subject=\"{$email['subject']}\"");
+
                 $success = Mailer::send(
                     $email['to_email'],
                     $email['subject'],
@@ -71,6 +126,7 @@ class EmailQueue {
                     $deleteStmt = $db->prepare("DELETE FROM email_queue WHERE id = ?");
                     $deleteStmt->execute([$email['id']]);
                     $processed++;
+                    self::writeQueueLog('SENT', "Email id={$email['id']} delivered successfully.");
                 } else {
                     $updateStmt = $db->prepare(
                         "UPDATE email_queue SET status = ?, attempts = attempts + 1, sent_at = ?, error_message = ? WHERE id = ?"
@@ -79,13 +135,36 @@ class EmailQueue {
                     $newStatus = $attempts >= (int)$email['max_attempts'] ? 'failed' : 'pending';
                     $errorMsg = class_exists('Mailer') && !empty(Mailer::$lastError) ? Mailer::$lastError : 'Mail send failed';
                     $updateStmt->execute([$newStatus, null, $errorMsg, $email['id']]);
+                    self::writeQueueLog('FAILED', "Email id={$email['id']} failed (attempt {$attempts}/{$email['max_attempts']}): {$errorMsg}");
                 }
             }
             return $processed;
         } catch (Exception $e) {
             error_log("EmailQueue process error: " . $e->getMessage());
+            self::writeQueueLog('ERROR', 'EmailQueue::process exception: ' . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * Write a timestamped line to the mail log (same file as Mailer uses).
+     * Only writes when MAIL_LOG is enabled.
+     */
+    private static function writeQueueLog(string $level, string $message): void
+    {
+        if (!defined('MAIL_LOG') || !MAIL_LOG) {
+            return;
+        }
+        $logPath = defined('MAIL_LOG_PATH') ? trim((string) MAIL_LOG_PATH) : '';
+        if ($logPath === '') {
+            return;
+        }
+        $logDir = dirname($logPath);
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
+        }
+        $line = '[' . date('Y-m-d H:i:s T') . ']  [' . $level . '] ' . $message . PHP_EOL;
+        @file_put_contents($logPath, $line, FILE_APPEND | LOCK_EX);
     }
 
     /**

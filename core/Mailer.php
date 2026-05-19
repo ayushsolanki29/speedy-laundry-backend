@@ -277,6 +277,8 @@ class Mailer {
      */
     private static function appendToSent(PHPMailer $mail): void
     {
+        // Hard-disabled: IMAP append causes PHP shutdown notices on Hostinger
+        // that corrupt JSON API responses. Re-enable only after fixing IMAP config.
         if (!defined('MAIL_APPEND_TO_SENT') || !MAIL_APPEND_TO_SENT) {
             return;
         }
