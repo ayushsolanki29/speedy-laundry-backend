@@ -20,6 +20,13 @@ if (!$input) {
     sendResponse('error', 'Invalid input data', null, 400);
 }
 
+// Verify Google reCAPTCHA v3
+$recaptchaToken = $input['recaptcha_token'] ?? null;
+$captchaResult = verifyRecaptcha($recaptchaToken);
+if (!$captchaResult['success']) {
+    sendResponse('error', $captchaResult['error'] ?? 'Security verification failed.', null, 403);
+}
+
 $full_name = sanitizeInput($input['full_name'] ?? '');
 $phone = sanitizeInput($input['phone'] ?? '');
 $email = sanitizeInput($input['email'] ?? '');

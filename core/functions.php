@@ -74,4 +74,73 @@ function getBearerToken() {
     }
     return null;
 }
+
+/**
+ * Verify Google reCAPTCHA v3 token.
+ */
+function verifyRecaptcha(?string $token): array {
+    if (empty($token)) {
+        return ['success' => false, 'error' => 'Security token missing. Please refresh and try again.'];
+    }
+
+    $secretKey = defined('RECAPTCHA_SECRET_KEY') ? RECAPTCHA_SECRET_KEY : '';
+    if (empty($secretKey)) {
+        error_log('RECAPTCHA_SECRET_KEY is not defined');
+        return ['success' => true, 'score' => 1.0];
+    }
+
+    $verifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
+    $postData = http_build_query([
+        'secret' => $secretKey,
+        'response' => $token,
+        'remoteip' => $_SERVER['REMOTE_ADDR'] ?? ''
+    ]);
+
+    $response = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $verifyUrl);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        $response = curl_exec($ch);
+        curl_close($ch);
+    }
+
+    if ($response === false) {
+        $context = stream_context_create([
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+                'content' => $postData,
+                'timeout' => 8
+            ]
+        ]);
+        $response = @file_get_contents($verifyUrl, false, $context);
+    }
+
+    if (!$response) {
+        error_log('Failed to verify reCAPTCHA with Google servers.');
+        return ['success' => false, 'error' => 'Security check temporarily unreachable. Please try again.'];
+    }
+
+    $result = json_decode($response, true);
+    if (!isset($result['success']) || !$result['success']) {
+        $errorCodes = isset($result['error-codes']) ? implode(', ', $result['error-codes']) : 'verification failed';
+        error_log('reCAPTCHA failed: ' . $errorCodes);
+        return ['success' => false, 'error' => 'Security verification failed. Please try again.'];
+    }
+
+    $score = isset($result['score']) ? (float)$result['score'] : 0.0;
+    $threshold = defined('RECAPTCHA_SCORE_THRESHOLD') ? RECAPTCHA_SCORE_THRESHOLD : 0.5;
+
+    if ($score < $threshold) {
+        error_log("reCAPTCHA bot suspected. Score: {$score}");
+        return ['success' => false, 'error' => 'Your submission was flagged by spam protection. Please try again or contact us directly.'];
+    }
+
+    return ['success' => true, 'score' => $score];
+}
 ?>

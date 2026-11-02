@@ -78,6 +78,11 @@ define('IMAP_SENT_FOLDER', getenv('IMAP_SENT_FOLDER') ?: 'INBOX.Sent');
 define('UPLOAD_BASE_URL', 'http://localhost/speedy-laundry/backend');
 define('UPLOAD_PATH', __DIR__ . '/../uploads/');
 
+// Google reCAPTCHA v3 Configuration
+define('RECAPTCHA_SECRET_KEY', getenv('RECAPTCHA_SECRET_KEY') ?: '6LeDSgwuAAAAAIjAzZE8f5cdK6OmRs2DWJzDbyxd');
+define('RECAPTCHA_SITE_KEY', getenv('RECAPTCHA_SITE_KEY') ?: '6LeDSgwuAAAAAMEdWr-veRQLvbW32fHzAYCPRoVR');
+define('RECAPTCHA_SCORE_THRESHOLD', 0.5); // Minimum score (0.0 = bot, 1.0 = human)
+
 // CORS Settings
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");

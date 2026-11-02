@@ -1,7 +1,7 @@
 # Speedy Laundry Backend - Apache config
 
 # Custom 403 Forbidden page
-ErrorDocument 403 http://localhost/speedy-laundry/backend/403.php
+ErrorDocument 403 https://server.speedylaundry.co.uk/backend/403.php
 
 # Deny direct access to sensitive folders (backup if folder .htaccess is bypassed)
 <FilesMatch "^\.">
