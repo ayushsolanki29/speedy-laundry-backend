@@ -128,8 +128,18 @@ function verifyRecaptcha(?string $token): array {
 
     $result = json_decode($response, true);
     if (!isset($result['success']) || !$result['success']) {
-        $errorCodes = isset($result['error-codes']) ? implode(', ', $result['error-codes']) : 'verification failed';
-        error_log('reCAPTCHA failed: ' . $errorCodes);
+        $errorCodes = isset($result['error-codes']) ? (array)$result['error-codes'] : ['verification failed'];
+        $errorCodeStr = implode(', ', $errorCodes);
+        error_log('reCAPTCHA failed: ' . $errorCodeStr . ' | Response: ' . $response);
+
+        // If the error is 'browser-error' (commonly triggered when legitimate users have AdBlock,
+        // Brave Shields, or in-app browsers that disrupt Google's telemetry), allow submission
+        // through so real customers are not turned away.
+        if (in_array('browser-error', $errorCodes, true)) {
+            error_log('reCAPTCHA browser-error encountered (likely AdBlock/in-app browser). Allowing submission through.');
+            return ['success' => true, 'score' => 0.5, 'note' => 'browser-error fallback'];
+        }
+
         return ['success' => false, 'error' => 'Security verification failed. Please try again.'];
     }
 
